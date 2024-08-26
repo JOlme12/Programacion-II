@@ -1,0 +1,110 @@
+#include <LiquidCrystal_I2C.h>
+#include <DHT.h>
+#include <DHT_U.h>
+#include <Wire.h>
+
+class PantallaLCD {
+  private:
+    LiquidCrystal_I2C lcd;
+  public:
+    PantallaLCD(uint8_t direccion, uint8_t columnas, uint8_t filas)
+      : lcd(direccion, columnas, filas) {
+    }
+
+    void iniciar() {
+      lcd.begin(16, 2);
+      lcd.init();
+      lcd.backlight();
+    }
+
+    void mostrarMensaje(const String& linea1, const String& linea2) {
+      lcd.setCursor(0, 0);
+      lcd.print(linea1);
+      lcd.setCursor(0, 1);
+      lcd.print(linea2);
+    }
+
+    void mostrarError() {
+      mostrarMensaje("*****ERROR******", "***NO SENSOR***");
+    }
+
+    void mostrarRiego() {
+      mostrarMensaje("*****Regando****", "****************");
+    }
+
+    void mostrarDatos(float temp, float hum) {
+      mostrarMensaje("Temp: " + String(temp) + " C", "Humedad: " + String(hum) + " %");
+    }
+};
+
+class BombaAgua {
+  private:
+    int pin;
+  public:
+    BombaAgua(int p) {
+      pin = p;
+      pinMode(pin, OUTPUT);
+      apagar();
+    }
+    
+    void encender() {
+      digitalWrite(pin, LOW);
+    }
+    
+    void apagar() {
+      digitalWrite(pin, HIGH);
+    }
+};
+
+class SensorTH {
+  private:
+    DHT dht;
+  public:
+    SensorTH(int pin, int type) : dht(pin, type) {
+      dht.begin();
+    }
+    
+    float leerTemperatura() {
+      return dht.readTemperature();
+    }
+    
+    float leerHumedad() {
+      return dht.readHumidity();
+    }
+};
+
+
+int bombaAguaPin = 8;
+int sensorTempPin = 9;
+
+
+PantallaLCD pantalla(0x27, 16, 2);
+BombaAgua bomba(bombaAguaPin);
+SensorTH sensor(sensorTempPin, DHT11);
+
+void setup() {
+  Wire.begin();
+  Serial.begin(9600);
+  pantalla.iniciar();
+}
+
+void loop() {
+  float temp = sensor.leerTemperatura();
+  float hum = sensor.leerHumedad();
+
+  pantalla.mostrarDatos(temp, hum);
+  
+  if(temp >= 25 && hum <= 20) { 
+    bomba.encender(); 
+    pantalla.mostrarRiego(); 
+    delay(5000); 
+  } else { 
+    bomba.apagar(); 
+  }
+
+  // Si no recibe informacion del sensor
+  if(temp == 0 && hum == 0) {
+    pantalla.mostrarError(); 
+    delay(1000); 
+  }
+}
